@@ -1,2 +1,2 @@
-# 2024PROJECTS
-Here I am gonna showcase my projects 
+# OCTANET JUNE Internship 
+Here I am gonna showcase my Internship related projects 
