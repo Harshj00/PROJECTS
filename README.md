@@ -1,2 +1,5 @@
-# OCTANET JUNE Internship 
-Here I am gonna showcase my Internship related projects 
+# PROJECTS OF 2024
+Here I am gonna showcase what i did
+
+
+
