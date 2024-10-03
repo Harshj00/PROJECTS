@@ -1,4 +1,4 @@
-# PROJECTS OF 2024
+# PROJECTS OF 2025
 Here I am gonna showcase what i did
 
 
