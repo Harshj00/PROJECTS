@@ -7,7 +7,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from PIL import Image, ImageTk
+import customtkinter as ctk     
+from PIL import Image, ImageTk, ImageEnhance, ImageFilter
 import urllib.request
 from io import BytesIO
 
@@ -16,48 +17,34 @@ class HousePricePredictionApp:
         self.root = root
         self.root.title("K.R.M.U Property Price Predictor")
         
-        # Make window responsive
+       
+        self.style = {
+            'bg_primary': '#000000',        # Pure black
+            'bg_secondary': '#0A0A0A',      # Soft black
+            'accent': '#FF2E63',            # Neon pink
+            'accent_light': '#00FFF5',      # Neon cyan
+            'text_primary': '#FFFFFF',      # Pure white
+            'text_secondary': '#E6F1FF',    # Ice white
+            'highlight': '#1A1A1A',         # Soft black
+            'success': '#00B4D8',           # Ocean blue
+            'input_bg': '#0A192F',          # Dark navy input
+            'gradient_start': '#000000',    # Black gradient start
+            'gradient_end': '#112240',      # Navy gradient end
+            'border': '#64FFDA',            # Cyan border
+            'label_text': '#FFFFFF'         # Pure white text
+        }
+
+        # Set window size and position
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         window_width = int(screen_width * 0.8)
         window_height = int(screen_height * 0.8)
-        self.root.geometry(f"{window_width}x{window_height}")
-        
-        # Center the window
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
-        self.root.geometry(f"+{x}+{y}")
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.minsize(1024, 768)
         
-        # Make window resizable
-        self.root.resizable(True, True)
-        
-        self.root.configure(bg='#1a1a2e')  # Dark modern background
-        
-        # Enable high FPS animations
-        self.root.tk.call('tk', 'scaling', 1.9)
-        self.root.update_idletasks()
-        
-        # Modern style configuration
-        self.style = {
-            'bg_primary': '#41038f',        # light face colour
-            'bg_secondary': '#d4fff7',
-            'accent': '#64FFDA',            # Mint green
-            'accent_light': '#7c7e80',      # Bright mint
-            'text_primary': '#030000',      # Bright white-blue
-            'text_secondary': '#050b14',    # Muted blue-gray
-            'highlight': '#FF6B6B',         # Coral red
-            'success': '#00FFFF',           # Cyan blue
-            'input_bg': '#dddec8',          # Deep blue for inputs
-            'gradient_start': '#0A192F',    # Gradient dark
-            'gradient_end': '#112240',      # Gradient light
-            'border': '#050b14',            # Border color
-            'label_text': '#2d2d3a'         # New darker matte color for labels
-        }
-
-        # Initialize the scaler and model
-        self.initialize_model()
-
-        # Enhanced feature set
+        # Initialize features
         self.features = {
             'Square_Footage': tk.StringVar(),
             'Bedrooms': tk.StringVar(),
@@ -69,184 +56,165 @@ class HousePricePredictionApp:
             'Security_Rating': tk.StringVar()
         }
 
-        # Load and set background image
-        try:
-            bg_image = Image.open("background.jpg")
-            bg_image = bg_image.resize((window_width, window_height), Image.Resampling.LANCZOS)
-            self.bg_photo = ImageTk.PhotoImage(bg_image)
-            bg_label = tk.Label(root, image=self.bg_photo)  # type: ignore
-            bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-        except Exception as e:
-            print(f"Using gradient background: {e}")
-            self.root.configure(bg=self.style['bg_primary'])
-
-        # Create main scrollable container with modern look
+        # Rest of the initialization
+        self.initialize_model()
+        self.root.configure(bg=self.style['bg_primary'])
+        
+        # Create main containers and UI elements
         self.main_canvas = tk.Canvas(
             root,
             bg=self.style['bg_primary'],
-            highlightthickness=0,
-            bd=0
+            highlightthickness=0
         )
-        
-        # Modern scrollbar style
-        scrollbar = ttk.Scrollbar(
-            root,
-            orient="vertical",
-            command=self.main_canvas.yview,
-            style="Modern.Vertical.TScrollbar"
-        )
-        
-        # Configure ttk styles
-        self.configure_styles()
-        
-        # Add smooth scrolling
-        self.main_canvas.configure(yscrollcommand=self.smooth_scroll)
-        
-        self.scrollable_frame = tk.Frame(self.main_canvas)
-        
-        # Configure scrollable frame
-        self.scrollable_frame.configure(bg=self.style['bg_primary'])
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all"))
-        )
-
-        self.main_canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-
-        # Pack main containers
         self.main_canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
 
-        # Create main container
         self.main_container = tk.Frame(
-            self.scrollable_frame,
+            self.main_canvas,
             bg=self.style['bg_primary']
         )
         self.main_container.pack(expand=True, fill='both', padx=30, pady=30)
 
-        # Initialize result frame and labels
-        self.fancy_result_frame = tk.Frame(
-            self.main_container,
-            bg=self.style['bg_secondary'],
-            bd=2,
-            relief='raised'
-        )
-        self.fancy_result_frame.pack(fill='x', pady=20, padx=10)
-
-        self.result_title = tk.Label(
-            self.fancy_result_frame,
-            text="Property Valuation",
-            font=("Helvetica", 16, "bold"),
-            bg=self.style['bg_secondary'],
-            fg=self.style['text_primary']
-        )
-        self.result_title.pack(pady=10)
-
-        self.result_label = tk.Label(
-            self.fancy_result_frame,
-            text="Enter property details and click Calculate",
-            font=("Helvetica", 14),
-            bg=self.style['bg_secondary'],
-            fg=self.style['text_primary']
-        )
-        self.result_label.pack(pady=10)
-
-        # Create sections
+        # Create UI sections
         self.create_glass_effect_header()
         self.create_glass_effect_content()
         self.create_prediction_section()
 
-        # Bind mousewheel
-        self.main_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-
-    def configure_styles(self):
-        # Configure ttk styles for modern look
-        style = ttk.Style()
-        
-        # Configure scrollbar
-        style.configure(
-            "Modern.Vertical.TScrollbar",
-            background=self.style['bg_secondary'],
-            troughcolor=self.style['bg_primary'],
-            width=10,
-            arrowsize=0
+    def create_gradient_background(self, width, height):
+        gradient_canvas = tk.Canvas(
+            self.root,
+            width=width,
+            height=height,
+            highlightthickness=0
         )
+        gradient_canvas.place(x=0, y=0, relwidth=1, relheight=1)
         
-        # Configure entry fields
-        style.configure(
-            "Modern.TEntry",
-            fieldbackground=self.style['bg_secondary'],
-            foreground=self.style['text_primary'],
-            padding=10
-        )
+        # Create a more vibrant gradient
+        for i in range(0, height, 2):
+            ratio = i / height
+            if ratio < 0.5:
+                color = self.interpolate_color('#0A192F', '#112240', ratio * 2)
+            else:
+                color = self.interpolate_color('#112240', '#1A2F4E', (ratio - 0.5) * 2)
+            gradient_canvas.create_line(0, i, width, i, fill=color)
 
     def create_glass_effect_header(self):
-        header_frame = tk.Frame(
+        header_frame = ctk.CTkFrame(
             self.main_container,
-            bg=self.style['bg_primary'],
-            bd=0
+            fg_color="transparent",
+            corner_radius=15
         )
         header_frame.pack(fill='x', pady=(0, 20))
 
-        # Animated gradient header
-        self.header_label = tk.Label(
+        # Add decorative elements
+        for i in range(2):
+            accent_line = ctk.CTkFrame(
+                header_frame,
+                height=3,
+                fg_color=self.style['accent'],
+                corner_radius=1
+            )
+            accent_line.pack(fill='x', pady=(10 
+                                             if i == 0 else 5), padx=100)
+
+        self.header_label = ctk.CTkLabel(
             header_frame,
             text="✨ Premium Property Valuation ✨",
-            font=("Helvetica", 36, "bold"),
-            fg=self.style['accent'],
-            bg=self.style['bg_primary']
+            font=("Helvetica", 42, "bold"),
+            text_color=self.style['accent'],
         )
         self.header_label.pack(pady=20)
         self.animate_header()
 
     def animate_header(self):
-        colors = [self.style['accent'], self.style['accent_light']]
+        # Updated animation colors for more dramatic effect
+        colors = ['#FF2E63', '#00FFF5', '#FFFFFF']  # Neon pink, cyan, and white
         current_color = 0
         
         def update_color():
             nonlocal current_color
-            self.header_label.configure(fg=colors[current_color])
-            current_color = (current_color + 1) % 2
-            self.root.after(1000, update_color)
+            self.header_label.configure(text_color=colors[current_color])
+            current_color = (current_color + 1) % 3
+            self.root.after(800, update_color)  # Slightly faster animation
         
         update_color()
 
     def create_glass_effect_content(self):
-        content_frame = tk.Frame(
+        content_frame = ctk.CTkFrame(
             self.main_container,
-            bg=self.style['bg_secondary'],
-            bd=2,
-            relief='raised'
+            fg_color=self.style['bg_secondary'],
+            corner_radius=15,
+            border_width=2,
+            border_color=self.style['accent']
         )
         content_frame.pack(fill='both', expand=True, pady=10)
 
-        # Add decorative line at the top
-        separator = tk.Frame(content_frame, height=2, bg=self.style['accent'])
-        separator.pack(fill='x', pady=(0, 10))
+        # Add glowing effect
+        glow_frame = ctk.CTkFrame(
+            content_frame,
+            fg_color=self.style['accent'],
+            corner_radius=15,
+            height=4
+        )
+        glow_frame.pack(fill='x', padx=20, pady=(0, 20))
+
+        # Glowing separator
+        separator = ctk.CTkFrame(
+            content_frame,
+            height=2,
+            fg_color=self.style['accent'],
+            corner_radius=1
+        )
+        separator.pack(fill='x', pady=(0, 10), padx=20)
 
         # Create grid container
         grid_frame = tk.Frame(content_frame, bg=self.style['bg_secondary'])
         grid_frame.pack(fill='both', expand=True, padx=20, pady=10)
 
-        # Configure grid columns
+        # Configure grid columns and rows with equal spacing
         for i in range(4):
-            grid_frame.columnconfigure(i, weight=1, pad=10)
+            grid_frame.columnconfigure(i, weight=1, pad=20)
+            grid_frame.rowconfigure(i, weight=1, pad=20)
+
+        # Define create_3d_frame function first
+        def create_3d_frame(parent):
+            frame = tk.Frame(parent, bg=self.style['bg_secondary'])
+            shadow = tk.Frame(frame, bg=self.style['border'], width=2)
+            shadow.place(relx=1.0, rely=0, relheight=1.0, anchor='ne')
+            shadow = tk.Frame(frame, bg=self.style['border'], height=2)
+            shadow.place(relx=0, rely=1.0, relwidth=1.0, anchor='sw')
+            return frame
 
         # Update the labels in create_glass_effect_content method
         label_texts = {
-            'Square_Footage': 'Square Footage (sq ft)',
+            'Square_Footage': 'Square Footage (sq ft) ',
+            'Bedrooms': 'Bedrooms       (1-5)',
+            'Bathrooms': 'No. of Bathrooms (1-4)',
             'Location_Rating': 'Location Rating (1-10)',
-            'Security_Rating': 'Security Rating (1-10)',
+            'Floor_Number': 'Floor Number (1-20)',
+            'Parking_Spots': 'No. of Parking Spots (0-2)',
             'Swimming_Pool': 'Swimming Pool (0/1)',
+            'Security_Rating': 'Security Rating (1-10)'
         }
 
-        # Create input fields in grid layout
-        row, col = 0, 0
+        # Create input fields in grid layout with fixed positions
+        field_positions = {
+            'Square_Footage': (0, 0),
+            'Bedrooms': (0, 1),
+            'Bathrooms': (0, 2),
+            'Location_Rating': (0, 3),
+            'Floor_Number': (1, 0),
+            'Parking_Spots': (1, 1),
+            'Swimming_Pool': (1, 2),
+            'Security_Rating': (1, 3)
+        }
+
+        # Update input field creation with fixed positions
         for feature, var in self.features.items():
-            # Create frame for each input
-            frame = tk.Frame(grid_frame, bg=self.style['bg_secondary'])
-            frame.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
+            row, col = field_positions[feature]
+            frame = create_3d_frame(grid_frame)
+            frame.grid(row=row, column=col, padx=20, pady=20, sticky='nsew')
             
+            # Rest of the input field creation code remains the same
             # Label with icon
             icon = self.get_feature_icon(feature)
             label_text = f"{icon} {label_texts.get(feature, feature)}"
@@ -265,15 +233,15 @@ class HousePricePredictionApp:
             entry_frame = tk.Frame(frame, bg=self.style['border'], bd=1, relief='solid')
             entry_frame.pack(fill='x')
             
-            entry = tk.Entry(
+            entry = ctk.CTkEntry(
                 entry_frame,
                 textvariable=var,
-                font=("Helvetica", 11),
-                bg=self.style['input_bg'],
-                fg=self.style['text_primary'],
-                insertbackground=self.style['accent'],
-                relief='flat',
-                width=20
+                font=("Helvetica", 12),
+                fg_color=self.style['input_bg'],
+                text_color=self.style['text_primary'],
+                border_color=self.style['border'],
+                corner_radius=8,
+                height=35
             )
             entry.pack(fill='x', padx=1, pady=1)
 
@@ -384,8 +352,45 @@ class HousePricePredictionApp:
     def show_result_popup(self, formatted_price):
         popup = tk.Toplevel(self.root)
         popup.title("Property Valuation Result")
-        popup.geometry("500x400")
+        popup.geometry("600x500")
         popup.configure(bg=self.style['bg_primary'])
+        
+        # Create 3D card effect
+        result_frame = ctk.CTkFrame(
+            popup,
+            fg_color=self.style['bg_secondary'],
+            corner_radius=15
+        )
+        result_frame.pack(expand=True, fill='both', padx=40, pady=40)
+        
+        # Animated price reveal
+        price_label = ctk.CTkLabel(
+            result_frame,
+            text="₹ 0",
+            font=("Helvetica", 48, "bold"),
+            text_color=self.style['accent']
+        )
+        price_label.pack(pady=40)
+        
+        def animate_price(current=0, target=int(formatted_price.replace(',', ''))):
+            if current < target:
+                next_val = min(current + (target // 20), target)
+                price_label.configure(text=f"₹ {self.format_indian_currency(next_val)}")
+                popup.after(50, lambda: animate_price(next_val, target))
+        
+        animate_price()
+        
+        # Modern close button
+        close_btn = ctk.CTkButton(
+            result_frame,
+            text="Close",
+            command=popup.destroy,
+            fg_color=self.style['highlight'],
+            hover_color=self.style['accent_light'],
+            corner_radius=10,
+            height=40
+        )
+        close_btn.pack(pady=20)
 
         # Center the popup
         popup.transient(self.root)
@@ -395,7 +400,7 @@ class HousePricePredictionApp:
         # Result display
         tk.Label(
             popup,
-            text="Estimated Property Value",
+            text="Estimated Property Price",
             font=("Helvetica", 24, "bold"),
             fg=self.style['accent'],
             bg=self.style['bg_primary']
@@ -421,40 +426,22 @@ class HousePricePredictionApp:
         ).pack(pady=20)
 
     def create_styled_button(self, parent, text, command, color):
-        frame = tk.Frame(parent, bg=self.style['bg_secondary'])
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
         
-        # Create gradient effect for button
-        btn = tk.Button(
+        btn = ctk.CTkButton(
             frame,
             text=text,
             command=command,
             font=("Helvetica", 12, "bold"),
-            bg=color,
-            fg=self.style['text_primary'],
-            pady=12,
-            padx=24,
-            relief='flat',
-            cursor='hand2',
-            activebackground=self.style['accent_light'],
-            activeforeground=self.style['bg_primary']
+            fg_color=color,
+            text_color='#FFFFFF',
+            corner_radius=12,
+            height=45,
+            border_width=2,
+            border_color=self.style['border']
         )
         
-        # Enhanced hover effect
-        def on_enter(e):
-            btn.configure(
-                bg=self.style['accent_light'],
-                fg=self.style['bg_primary']
-            )
-        def on_leave(e):
-            btn.configure(
-                bg=color,
-                fg=self.style['text_primary']
-            )
-            
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
-        
-        btn.pack(padx=2, pady=2)
+        btn.pack(padx=3, pady=3, fill='x')
         return frame
 
     def get_feature_icon(self, feature):
@@ -478,9 +465,9 @@ class HousePricePredictionApp:
         return '✨'
 
     def _on_mousewheel(self, event):
-        # Improved smooth scrolling
-        delta = int(-1 * (event.delta/120))
-        self.main_canvas.yview_scroll(delta, "units")
+        # More efficient scrolling
+        self.main_canvas.yview_scroll(int(-1 * (event.delta/60)), "units")
+        return "break"  # Prevent event propagation
 
     def reset_fields(self):
         for var in self.features.values():
@@ -495,27 +482,42 @@ class HousePricePredictionApp:
         pass
 
     def initialize_model(self):
-        # Generate sample data for demonstration
+        # Generate sample data based on Delhi real estate market
         np.random.seed(42)
         n_samples = 1000
         
-        # Generate synthetic features
-        X = np.random.rand(n_samples, 8)  # 8 features
+        # Generate features with realistic ranges for Delhi
+        square_footage = np.random.uniform(500, 4000, n_samples)  # 500-4000 sq ft
+        bedrooms = np.random.randint(1, 6, n_samples)  # 1-5 bedrooms
+        bathrooms = np.random.randint(1, 5, n_samples)  # 1-4 bathrooms
+        location_rating = np.random.uniform(1, 10, n_samples)  # Location score
+        floor_number = np.random.randint(1, 20, n_samples)  # 1-20 floors
+        parking_spots = np.random.randint(0, 3, n_samples)  # 0-2 parking spots
+        swimming_pool = np.random.randint(0, 2, n_samples)  # 0-1 (No/Yes)
+        security_rating = np.random.uniform(1, 10, n_samples)  # Security score
+    
+        # Combine features
+        X = np.column_stack([
+            square_footage, bedrooms, bathrooms, location_rating,
+            floor_number, parking_spots, swimming_pool, security_rating
+        ])
         
-        # Generate synthetic prices based on the 8 features we have
+        # Generate prices based on Delhi market rates (in INR)
+        base_price_per_sqft = 12000  # Base price per sq ft in Delhi
+        
         y = (
-            X[:, 0] * 5000000 +  # Square Footage
-            X[:, 1] * 2000000 +  # Bedrooms
-            X[:, 2] * 1500000 +  # Bathrooms
-            X[:, 3] * 3000000 +  # Location Rating
-            X[:, 4] * 500000 +   # Floor Number
-            X[:, 5] * 800000 +   # Parking Spots
-            X[:, 6] * 2000000 +  # Swimming Pool
-            X[:, 7] * 2000000    # Security Rating
+            square_footage * base_price_per_sqft +  # Base price by area
+            bedrooms * 1000000 +                    # Premium for each bedroom
+            bathrooms * 800000 +                    # Premium for each bathroom
+            location_rating * 2000000 +             # Location premium
+            floor_number * 200000 +                 # Floor premium
+            parking_spots * 1500000 +               # Parking premium
+            swimming_pool * 5000000 +               # Swimming pool premium
+            security_rating * 1000000               # Security premium
         )
         
-        # Add some noise
-        y += np.random.normal(0, 500000, n_samples)
+        # Add market variations (±10%)
+        y += np.random.normal(0, 0.1 * y, n_samples)
         
         # Split the data
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -533,8 +535,60 @@ class HousePricePredictionApp:
         self.main_canvas.yview_moveto(args[0])
         self.root.update_idletasks()
 
+    def create_gradient_background(self, width, height):
+        gradient_canvas = tk.Canvas(
+            self.root,
+            width=width,
+            height=height,
+            highlightthickness=0
+        )
+        gradient_canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        
+        # Reduce number of gradient lines for better performance
+        step = 2  # Increase step size for faster rendering
+        for i in range(0, height, step):
+            ratio = i / height
+            color = self.interpolate_color(
+                self.style['gradient_start'],
+                self.style['gradient_end'],
+                ratio
+            )
+            gradient_canvas.create_line(0, i, width, i, fill=color)
+
+    def interpolate_color(self, color1, color2, ratio):
+        # Fast color interpolation
+        r1, g1, b1 = int(color1[1:3], 16), int(color1[3:5], 16), int(color1[5:7], 16)
+        r2, g2, b2 = int(color2[1:3], 16), int(color2[3:5], 16), int(color2[5:7], 16)
+        r = int(r1 * (1 - ratio) + r2 * ratio)
+        g = int(g1 * (1 - ratio) + g2 * ratio)
+        b = int(b1 * (1 - ratio) + b2 * ratio)
+        return f'#{r:02x}{g:02x}{b:02x}'
+
 # Run the application
 if __name__ == "__main__":
     root = tk.Tk()
     app = HousePricePredictionApp(root)
     root.mainloop()
+
+    # Add resize handler
+    self.root.bind('<Configure>', self.on_window_resize)
+
+    def on_window_resize(self, event):
+        # Only handle window resize events
+        if event.widget == self.root:
+            # Update font sizes and layouts
+            header_font_size = min(42, int(self.root.winfo_width() / 30))
+            self.header_label.configure(font=("Helvetica", header_font_size, "bold"))
+            
+            # Update other responsive elements as needed
+            self.update_responsive_layout()
+
+    def update_responsive_layout(self):
+        # Update padding and margins
+        window_width = self.root.winfo_width()
+        window_height = self.root.winfo_height()
+        
+        self.main_container.pack_configure(
+            padx=int(window_width * 0.05),
+            pady=int(window_height * 0.03)
+        )
